@@ -1,0 +1,65 @@
+/* Configurações Globais */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #ffffff;
+    /* Efeito de brilho radial rosa suave ao centro */
+    background-image: radial-gradient(circle at center, rgba(255, 215, 215, 0.75) 0%, rgba(255, 235, 235, 0.35) 40%, rgba(255, 255, 255, 0) 70%);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+}
+
+/* Ícone/Logótipo */
+.logo {
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Caixa de Entrada */
+.search-box {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.search-box input {
+    width: 100%;
+    max-width: 480px;
+    padding: 14px 24px;
+    font-size: 15px;
+    color: #666666;
+    background-color: #ffffff;
+    border: 1px solid #eaeaea;
+    border-radius: 30px;
+    outline: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease-in-out;
+}
+
+.search-box input::placeholder {
+    color: #9e9e9e;
+}
+
+.search-box input:focus {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border-color: #ffd0b0;
+}
