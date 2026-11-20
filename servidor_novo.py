@@ -6,21 +6,26 @@ import json
 import time
 import os
 import requests
+import psutil
 import pandas as pd
 
 PORTA = 6789
 
 LOGS_DIR = "./logs"
-CSV_PATH = os.path.join(LOGS_DIR, "prompts.csv")
-COLUNAS = ["timestamp", "IP", "user_agent", "prompt", "latencia_ms", "status_llm", "resposta_engodo"]
+LOGS_CSV_PATH = os.path.join(LOGS_DIR, "prompts.csv")
+LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
+COLUNAS_LLM = ["timestamp", "IP", "user_agent", "prompt", "latencia_llm_ms", "status_llm", "resposta_engodo"]
+COLUNAS_REDE = ["latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb"]
 csv_lock = Lock()  # Evita conflito de escrita entre threads simultâneas
 
 
 os.makedirs(LOGS_DIR, exist_ok=True)
-if not os.path.exists(CSV_PATH):
-    pd.DataFrame(columns=COLUNAS).to_csv(CSV_PATH, index=False)
+if not os.path.exists(LOGS_CSV_PATH):
+    pd.DataFrame(columns=COLUNAS_LLM).to_csv(LOGS_CSV_PATH, index=False)
+if not os.path.exists(LOGS_REDE_PATH):
+    pd.DataFrame(columns=COLUNAS_REDE).to_csv(LOGS_REDE_PATH, index=False)
 
-def salvar_csv(registro: dict) -> None:
+def salvar_csv(registro: dict, COLUNAS, CSV_PATH) -> None:
     """Acrescenta um registro ao CSV de logs (thread-safe). Campos ausentes ficam vazios."""
     linha = pd.DataFrame([registro]).reindex(columns=COLUNAS)
     with csv_lock:
@@ -61,7 +66,26 @@ def formatar_resposta_http(status: str, content_type: str, body: bytes) -> bytes
     ).encode("utf-8")
     return header + body
 
+def consultar_llm(prompt: str) -> tuple[str, str]:
+    return "resposta","não ok"
+
+def escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb):
+    salvar_csv({
+        "latencia_ms": latencia_ms,
+        "bytes_requisicao": bytes_requisicao,
+        "bytes_resposta": bytes_resp,
+        "cpu_pct": cpu_pct,
+        "ram_mb": ram_mb,
+    }, COLUNAS_REDE, LOGS_REDE_PATH)
+
 def montar_resposta(headers_str: str, body_str: str, client_ip: str):
+    
+    psutil.cpu_percent(interval=None)
+    inicio = time.perf_counter()
+    html = 0
+
+    bytes_resp = 0
+
     linhas = headers_str.split("\r\n")
     partes = linhas[0].split()
     if len(partes) < 2:
@@ -84,10 +108,41 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
             # Substitui tags do Flask por caminhos estáticos diretos
             html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
             html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
+
+            latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+            cpu_pct = psutil.cpu_percent(interval=None)
+            ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
+        
+            bytes_requisicao = len(headers_str) + len(body_str)
+            bytes_resp = len(html)
+
+            escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb)
+            
             return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
         except FileNotFoundError:
             return formatar_resposta_http("404 Not Found", "text/plain", b"index.html nao encontrado")
 
+    if metodo == "GET" and caminho == "/wp-login.php":
+            try:
+                with open(os.path.join("templates", "login.html"), "r", encoding="utf-8") as f:
+                    html = f.read()
+                # Substitui tags do Flask por caminhos estáticos diretos
+                html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
+                html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
+
+                latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+                cpu_pct = psutil.cpu_percent(interval=None)
+                ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
+            
+                bytes_requisicao = len(headers_str) + len(body_str)
+                bytes_resp = len(html)
+
+                escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb)
+
+                return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
+            except FileNotFoundError:
+                return formatar_resposta_http("404 Not Found", "text/plain", b"login.html nao encontrado")
+    
     # Rota 2: Arquivos estáticos (CSS, JS, imagens)
     if metodo == "GET" and caminho.startswith("/static/"):
         nome_arquivo = os.path.basename(caminho)
@@ -100,9 +155,11 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
             return formatar_resposta_http("200 OK", mime, conteudo)
         return formatar_resposta_http("404 Not Found", "text/plain", b"Arquivo estatico nao encontrado")
 
+    # Aqui o método é POST (INPUT - PROMPT)
+
     # Rota 3: Endpoint da API do Honeypot (POST /api/perguntar)
     if metodo == "POST" and caminho == "/api/perguntar":
-        inicio = time.perf_counter()
+        inicio_llm = time.perf_counter()
         try:
             dados = json.loads(body_str) if body_str else {}
         except json.JSONDecodeError:
@@ -111,25 +168,63 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
         prompt = dados.get("prompt", "")
         data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # resposta_engodo, status_llm = consultar_llm(prompt) (AQUI: DEVE-SE IMPLEMENTAR A FUNÇÃO CONSULTAR PROMPT)
-        resposta_engodo = "Processando o seu pedido no modelo..."  # placeholder até consultar_llm existir
-        latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+        resposta_engodo, status_llm = consultar_llm(prompt) # (AQUI: DEVE-SE IMPLEMENTAR A FUNÇÃO CONSULTAR PROMPT)
+        # resposta_engodo = "Processando o seu pedido no modelo..."   placeholder até consultar_llm existir
+        latencia_llm_ms = round((time.perf_counter() - inicio_llm) * 1000, 2)
 
-        # print(f"\n[HONEYPOT SOCKET CAPTURA] {data_hora} | IP: {client_ip} | {status_llm} ({latencia_ms} ms)")
-        # print(f"Prompt: {prompt}\nEngodo: {resposta_engodo[:150]}...\n")
+        print(f"\n[HONEYPOT SOCKET CAPTURA] {data_hora} | IP: {client_ip} | {status_llm} ({latencia_llm_ms} ms)")
+        print(f"Prompt: {prompt}\nEngodo: {resposta_engodo[:150]}...\n")
+
 
         salvar_csv({
             "timestamp": data_hora,
             "IP": client_ip,
             "user_agent": user_agent,
             "prompt": prompt,
-            "latencia_ms": latencia_ms,
-            # "status_llm": status_llm,
-            # "resposta_engodo": resposta_engodo
-        })
+            "latencia_llm_ms": latencia_llm_ms,
+            "status_llm": status_llm,
+            "resposta_engodo": resposta_engodo
+        }, COLUNAS_LLM, LOGS_CSV_PATH)
+        
+        if status_llm!="ok":
+            try:
+                with open(os.path.join("templates", "login.html"), "r", encoding="utf-8") as f:
+                    html = f.read()
+                # Substitui tags do Flask por caminhos estáticos diretos
+                html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
+                html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
 
+                latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+                cpu_pct = psutil.cpu_percent(interval=None)
+                ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
+            
+                bytes_requisicao = len(headers_str) + len(body_str)
+                bytes_resp = len(html)
+
+                escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb)
+
+                return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
+            except FileNotFoundError:
+                return formatar_resposta_http("404 Not Found", "text/plain", b"login.html nao encontrado")
+
+        # latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+        # cpu_pct = psutil.cpu_percent(interval=None)
+        # ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
+    
+        # bytes_requisicao = len(headers_str) + len(body_str)
+        # bytes_resp = len(html)
+    
+        # salvar_csv({
+        #     "latencia_ms": latencia_ms,
+        #     "bytes_requisicao": bytes_requisicao,
+        #     "bytes_resposta": bytes_resp,
+        #     "cpu_pct": cpu_pct,
+        #     "ram_mb": ram_mb,
+        # }, COLUNAS_REDE, LOGS_REDE_PATH)
+        
         payload_json = json.dumps({"status": "success", "resposta": resposta_engodo}, ensure_ascii=False).encode("utf-8")
         return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
+
 
     return formatar_resposta_http("404 Not Found", "text/html; charset=utf-8", b"<h1>404 Not Found</h1>")
 

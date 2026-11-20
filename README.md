@@ -15,6 +15,7 @@ Repositório do trabalho da disciplina de Redes de Computadores do curso de Enge
 ## Tecnologias Utilizadas
 
 ## Como Executar
+pip install psutil
 
 ### Requisitos
 
