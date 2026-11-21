@@ -1,6 +1,7 @@
 from socket import *
 from threading import Thread, Lock, active_count
 from datetime import datetime
+# from pyflowmeter.sniffer import create_sniffer
 import mimetypes
 import json
 import re
@@ -30,9 +31,9 @@ COLUNAS_REQUISICAO = ["timestamp", "IP", "metodo", "path", "user_agent", "prompt
 # bytes_requisicao: quantos bytes foram usados na requisição da página pelo atacante
 # bytes_resposta: quantos bytes foram usados para gerar a resposta à requisição do atacante
 # cpu_pct: porcentagem de uso da cpu do servidor para responder as requisições atuais (mais interessante quando tivermos a llm funcionando)
-# ram_mb: quantidade de RAM física utilizada pelo sistema em bytes
+# ram_mb: quantidade de RAM física utilizada pelo sistema em megabytes
 LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
-COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb"]
+COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb", "qnt_threads"]
 
 csv_lock = Lock()  # Evita conflito de escrita entre threads simultâneas
 
@@ -116,7 +117,7 @@ def consultar_llm(prompt: str) -> tuple[str, str]:
     except (ValueError, KeyError, IndexError):
         return "", "erro: resposta inesperada"
 
-def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html):
+def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html, qnt_threads):
 
     latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
     cpu_pct = psutil.cpu_percent(interval=None)
@@ -132,6 +133,7 @@ def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html):
         "bytes_resposta": bytes_resp,
         "cpu_pct": cpu_pct,
         "ram_mb": ram_mb,
+        "qnt_threads": qnt_threads,
     }, COLUNAS_REDE, LOGS_REDE_PATH)
 
 def escreve_csv_req(data_hora, client_ip, metodo, path, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo):
@@ -148,7 +150,7 @@ def escreve_csv_req(data_hora, client_ip, metodo, path, user_agent, prompt, late
         "resposta_engodo": resposta_engodo
     }, COLUNAS_REQUISICAO, LOGS_CSV_PATH)
 
-def montar_resposta(headers_str: str, body_str: str, client_ip: str):
+def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads: int):
     
     psutil.cpu_percent(interval=None)
     inicio = time.perf_counter()
@@ -179,7 +181,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
             data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
-            escreve_csv_rede(client_ip, inicio, headers_str, body_str, html)
+            escreve_csv_rede(client_ip, inicio, headers_str, body_str, html.encode("utf-8"), qnt_threads)
             
             return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
         except FileNotFoundError:
@@ -196,7 +198,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
-                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html)
+                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html.encode("utf-8"), qnt_threads)
 
                 return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
             except FileNotFoundError:
@@ -215,7 +217,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
             # data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
-            # escreve_csv_rede(client_ip, inicio, headers_str, body_str, conteudo)
+            # escreve_csv_rede(client_ip, inicio, headers_str, body_str, conteudo, qnt_threads)
 
             return formatar_resposta_http("200 OK", mime, conteudo)
         return formatar_resposta_http("404 Not Found", "text/plain", b"Arquivo estatico nao encontrado")
@@ -247,11 +249,11 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
             # O fetch() do script.js espera JSON; então indicamos para onde redirecionar
             # e o próprio navegador faz o GET /wp-login.php (que serve o login.html)
         
-                payload_json = json.dumps({"status": "redirect", "url": "/wp-login.php"}).encode("utf-8")
+            payload_json = json.dumps({"status": "redirect", "url": "/wp-login.php"}).encode("utf-8")
 
-                escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json)
+            escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json, qnt_threads)
 
-                return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
+            return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
 
         # Extrai só o documento HTML: do <!DOCTYPE até o último </html>, descartando
         # qualquer texto ou cerca de markdown que a LLM tenha colocado antes ou depois
@@ -268,7 +270,7 @@ def handle_client(connectionSocket: socket, addr: tuple):
     try:
         headers_str, body_str = ler_requisicao_completa(connectionSocket)
         if headers_str:                            # vazio = cliente fechou sem enviar nada
-            connectionSocket.sendall(montar_resposta(headers_str, body_str, addr[0]))
+            connectionSocket.sendall(montar_resposta(headers_str, body_str, addr[0], active_count()))
     finally:
         connectionSocket.close()
 
@@ -278,6 +280,21 @@ if __name__ == '__main__':                     # só roda ao executar este arqui
     serverSocket.bind(('0.0.0.0', PORTA))
     serverSocket.listen(128)
     print(f'Servidor multithread na porta {PORTA}...')
+
+    # sniffer = create_sniffer(
+    #         input_file='path_to_the_file.pcap',
+    #         to_csv=True,
+    #         output_file='./flows_test.csv',
+    #     )
+
+    # sniffer.start()
+    # try:
+    #     sniffer.join()
+    # except KeyboardInterrupt:
+    #     print('Stopping the sniffer')
+    #     sniffer.stop()
+    # finally:
+    #     sniffer.join()
 
     while True:
         connectionSocket, addr = serverSocket.accept()

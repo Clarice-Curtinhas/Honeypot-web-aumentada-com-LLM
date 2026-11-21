@@ -17,6 +17,9 @@ Repositório do trabalho da disciplina de Redes de Computadores do curso de Enge
 ## Como Executar
 pip install psutil
 
+pip install --upgrade pip
+pip install pyflowmeter
+
 ### Requisitos
 
 ### Instruções de Execução
