@@ -12,16 +12,23 @@ import pandas as pd
 PORTA = 6789
 
 LOGS_DIR = "./logs"
-LOGS_CSV_PATH = os.path.join(LOGS_DIR, "prompts.csv")
+LOGS_CSV_PATH = os.path.join(LOGS_DIR, "requisicao.csv")
 LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
-COLUNAS_LLM = ["timestamp", "IP", "user_agent", "prompt", "latencia_llm_ms", "status_llm", "resposta_engodo"]
-COLUNAS_REDE = ["latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb"]
+COLUNAS_REQUISICAO = ["timestamp", "IP", "metodo", "path", "user_agent", "prompt", "latencia_llm_ms", "status_llm", "resposta_engodo"]
+COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb"]
+# PARÂMETRO DE REDE MEDIDOS:
+# latencia_ms: latência total para a geração de uma resposta da requisição do atacante
+# bytes_requisicao: quantos bytes foram usados na requisição da página pelo atacante
+# bytes_resposta: quantos bytes foram usados para gerar a resposta à requisição do atacante
+# cpu_pct: porcentagem de uso da cpu do servidor para responder as requisições atuais (mais interessante quando tivermos a llm funcionando)
+# ram_mb: quantidade de RAM física utilizada pelo sistema em bytes
+
 csv_lock = Lock()  # Evita conflito de escrita entre threads simultâneas
 
 
 os.makedirs(LOGS_DIR, exist_ok=True)
 if not os.path.exists(LOGS_CSV_PATH):
-    pd.DataFrame(columns=COLUNAS_LLM).to_csv(LOGS_CSV_PATH, index=False)
+    pd.DataFrame(columns=COLUNAS_REQUISICAO).to_csv(LOGS_CSV_PATH, index=False)
 if not os.path.exists(LOGS_REDE_PATH):
     pd.DataFrame(columns=COLUNAS_REDE).to_csv(LOGS_REDE_PATH, index=False)
 
@@ -69,8 +76,17 @@ def formatar_resposta_http(status: str, content_type: str, body: bytes) -> bytes
 def consultar_llm(prompt: str) -> tuple[str, str]:
     return "resposta","não ok"
 
-def escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb):
+def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html):
+
+    latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+    cpu_pct = psutil.cpu_percent(interval=None)
+    ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
+
+    bytes_requisicao = len(headers_str) + len(body_str)
+    bytes_resp = len(html)
+    
     salvar_csv({
+        "src_IP": client_ip,
         "latencia_ms": latencia_ms,
         "bytes_requisicao": bytes_requisicao,
         "bytes_resposta": bytes_resp,
@@ -78,13 +94,24 @@ def escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb):
         "ram_mb": ram_mb,
     }, COLUNAS_REDE, LOGS_REDE_PATH)
 
+def escreve_csv_req(data_hora, client_ip, metodo, path, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo):
+    
+    salvar_csv({
+        "timestamp": data_hora,
+        "IP": client_ip,
+        "metodo": metodo,
+        "path": path,
+        "user_agent": user_agent,
+        "prompt": prompt,
+        "latencia_llm_ms": latencia_llm_ms,
+        "status_llm": status_llm,
+        "resposta_engodo": resposta_engodo
+    }, COLUNAS_REQUISICAO, LOGS_CSV_PATH)
+
 def montar_resposta(headers_str: str, body_str: str, client_ip: str):
     
     psutil.cpu_percent(interval=None)
     inicio = time.perf_counter()
-    html = 0
-
-    bytes_resp = 0
 
     linhas = headers_str.split("\r\n")
     partes = linhas[0].split()
@@ -109,14 +136,10 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
             html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
             html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
 
-            latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-            cpu_pct = psutil.cpu_percent(interval=None)
-            ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
-        
-            bytes_requisicao = len(headers_str) + len(body_str)
-            bytes_resp = len(html)
+            data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb)
+            escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
+            escreve_csv_rede(client_ip, inicio, headers_str, body_str, html)
             
             return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
         except FileNotFoundError:
@@ -130,14 +153,10 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
                 html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
                 html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
 
-                latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-                cpu_pct = psutil.cpu_percent(interval=None)
-                ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
-            
-                bytes_requisicao = len(headers_str) + len(body_str)
-                bytes_resp = len(html)
+                data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb)
+                escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
+                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html)
 
                 return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
             except FileNotFoundError:
@@ -152,6 +171,12 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
                 conteudo = f.read()
             mime, _ = mimetypes.guess_type(caminho_local)
             mime = mime or "application/octet-stream"
+
+            # data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
+            # escreve_csv_rede(client_ip, inicio, headers_str, body_str, conteudo)
+
             return formatar_resposta_http("200 OK", mime, conteudo)
         return formatar_resposta_http("404 Not Found", "text/plain", b"Arquivo estatico nao encontrado")
 
@@ -175,16 +200,8 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
         print(f"\n[HONEYPOT SOCKET CAPTURA] {data_hora} | IP: {client_ip} | {status_llm} ({latencia_llm_ms} ms)")
         print(f"Prompt: {prompt}\nEngodo: {resposta_engodo[:150]}...\n")
 
+        escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo)
 
-        salvar_csv({
-            "timestamp": data_hora,
-            "IP": client_ip,
-            "user_agent": user_agent,
-            "prompt": prompt,
-            "latencia_llm_ms": latencia_llm_ms,
-            "status_llm": status_llm,
-            "resposta_engodo": resposta_engodo
-        }, COLUNAS_LLM, LOGS_CSV_PATH)
         
         if status_llm!="ok":
             try:
@@ -194,33 +211,12 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
                 html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
                 html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
 
-                latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-                cpu_pct = psutil.cpu_percent(interval=None)
-                ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
-            
-                bytes_requisicao = len(headers_str) + len(body_str)
-                bytes_resp = len(html)
-
-                escreve_csv(latencia_ms, bytes_requisicao, bytes_resp, cpu_pct, ram_mb)
+                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html)
 
                 return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
             except FileNotFoundError:
                 return formatar_resposta_http("404 Not Found", "text/plain", b"login.html nao encontrado")
 
-        # latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-        # cpu_pct = psutil.cpu_percent(interval=None)
-        # ram_mb = round(psutil.virtual_memory().used / (1024 * 1024), 1)
-    
-        # bytes_requisicao = len(headers_str) + len(body_str)
-        # bytes_resp = len(html)
-    
-        # salvar_csv({
-        #     "latencia_ms": latencia_ms,
-        #     "bytes_requisicao": bytes_requisicao,
-        #     "bytes_resposta": bytes_resp,
-        #     "cpu_pct": cpu_pct,
-        #     "ram_mb": ram_mb,
-        # }, COLUNAS_REDE, LOGS_REDE_PATH)
         
         payload_json = json.dumps({"status": "success", "resposta": resposta_engodo}, ensure_ascii=False).encode("utf-8")
         return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
