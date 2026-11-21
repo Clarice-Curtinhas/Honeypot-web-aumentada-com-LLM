@@ -3,6 +3,7 @@ from threading import Thread, Lock, active_count
 from datetime import datetime
 import mimetypes
 import json
+import re
 import time
 import os
 import requests
@@ -12,16 +13,26 @@ import pandas as pd
 PORTA = 6789
 
 LOGS_DIR = "./logs"
+
+#variaveis da llm
+#=============================================
+BASE_URL = os.getenv("LLM_BASE_URL", "http://127.0.0.1:4000/v1").rstrip("/")
+CA_CERT = os.getenv("LLM_CA_CERT")
+MODELO = os.getenv("LLM_MODEL", "qwen7b")
+TIMEOUT_S = 600
+
 LOGS_CSV_PATH = os.path.join(LOGS_DIR, "requisicao.csv")
-LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
 COLUNAS_REQUISICAO = ["timestamp", "IP", "metodo", "path", "user_agent", "prompt", "latencia_llm_ms", "status_llm", "resposta_engodo"]
-COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb"]
+
+#=============================================
 # PARÂMETRO DE REDE MEDIDOS:
 # latencia_ms: latência total para a geração de uma resposta da requisição do atacante
 # bytes_requisicao: quantos bytes foram usados na requisição da página pelo atacante
 # bytes_resposta: quantos bytes foram usados para gerar a resposta à requisição do atacante
 # cpu_pct: porcentagem de uso da cpu do servidor para responder as requisições atuais (mais interessante quando tivermos a llm funcionando)
 # ram_mb: quantidade de RAM física utilizada pelo sistema em bytes
+LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
+COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb"]
 
 csv_lock = Lock()  # Evita conflito de escrita entre threads simultâneas
 
@@ -74,7 +85,36 @@ def formatar_resposta_http(status: str, content_type: str, body: bytes) -> bytes
     return header + body
 
 def consultar_llm(prompt: str) -> tuple[str, str]:
-    return "resposta","não ok"
+    """Envia o prompt à LLM e devolve (resposta, status_llm)."""
+    api_key = os.getenv("LLM_API_KEY", "sk-...")
+    # if not api_key:
+    #     return "", "erro: LLM_API_KEY nao definida"
+
+    try:
+        r = requests.post(
+            f"{BASE_URL}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": MODELO,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 400,
+                "temperature": 0.3,
+            },
+            verify=CA_CERT or True,
+            timeout=TIMEOUT_S,
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip(), "ok"
+    except requests.exceptions.SSLError:
+        return "", "erro: certificado (defina LLM_CA_CERT)"
+    except requests.exceptions.ConnectionError:
+        return "", "erro: LLM inacessivel"
+    except requests.exceptions.Timeout:
+        return "", "erro: timeout"
+    except requests.exceptions.HTTPError as e:
+        return "", f"erro: HTTP {e.response.status_code} - {e.response.text[:200]}"
+    except (ValueError, KeyError, IndexError):
+        return "", "erro: resposta inesperada"
 
 def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html):
 
@@ -203,24 +243,24 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str):
         escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo)
 
         
-        if status_llm!="ok":
-            try:
-                with open(os.path.join("templates", "login.html"), "r", encoding="utf-8") as f:
-                    html = f.read()
-                # Substitui tags do Flask por caminhos estáticos diretos
-                html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
-                html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
-
-                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html)
-
-                return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
-            except FileNotFoundError:
-                return formatar_resposta_http("404 Not Found", "text/plain", b"login.html nao encontrado")
-
+        if status_llm != "ok":
+            # O fetch() do script.js espera JSON; então indicamos para onde redirecionar
+            # e o próprio navegador faz o GET /wp-login.php (que serve o login.html)
         
+                payload_json = json.dumps({"status": "redirect", "url": "/wp-login.php"}).encode("utf-8")
+
+                escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json)
+
+                return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
+
+        # Extrai só o documento HTML: do <!DOCTYPE até o último </html>, descartando
+        # qualquer texto ou cerca de markdown que a LLM tenha colocado antes ou depois
+        documento = re.search(r"<!DOCTYPE.*</html\s*>", resposta_engodo, re.S | re.I)
+        if documento:
+            resposta_engodo = documento.group(0)
+
         payload_json = json.dumps({"status": "success", "resposta": resposta_engodo}, ensure_ascii=False).encode("utf-8")
         return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
-
 
     return formatar_resposta_http("404 Not Found", "text/html; charset=utf-8", b"<h1>404 Not Found</h1>")
 

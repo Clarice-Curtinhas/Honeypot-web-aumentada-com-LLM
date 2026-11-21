@@ -24,10 +24,20 @@ document.getElementById('chatForm').addEventListener('submit', async function(e)
 
         const data = await response.json();
 
-        // 3) Substitui a mensagem de espera pela resposta do servidor
-        //    (textContent e não innerHTML, para não executar HTML vindo da resposta)
-        respostaDiv.textContent = data.resposta;
-        inputField.value = '';
+        // Servidor pediu redirecionamento (ex.: LLM falhou -> página de login)
+        if (data.status === 'redirect') {
+            window.location.href = data.url;
+            return;
+        }
+
+        // 3) Substitui a página inteira pelo HTML gerado pela LLM, dentro de um iframe
+        //    sandbox vazio: o HTML/CSS é renderizado, mas nenhum script roda, formulários
+        //    não enviam nada e o conteúdo não tem acesso à nossa origem
+        const iframe = document.createElement('iframe');
+        iframe.sandbox = '';
+        iframe.srcdoc = data.resposta;
+        iframe.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;background:#fff';
+        document.body.replaceChildren(iframe);
 
     } catch (error) {
         console.error('Erro ao enviar a requisição:', error);
