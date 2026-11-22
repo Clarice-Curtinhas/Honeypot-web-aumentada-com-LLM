@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configurações Gerais</title>
+    <!-- CSS estático do Flask -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body class="pagina">
+    <div class="container">
+      <!-- Logótipo Favo de Mel (SVG) -->
+      <div class="logo">
+        <svg width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="50,5 72,17.5 72,42.5 50,55 28,42.5 28,17.5" fill="#FFA500" />
+          <polygon points="73,44 95,56.5 95,81.5 73,94 51,81.5 51,56.5" fill="#FF8C00" />
+          <polygon points="27,44 49,56.5 49,81.5 27,94 5,81.5 5,56.5" fill="none" stroke="#FFA500" stroke-width="2" />
+        </svg>
+      </div>
+
+      <form id="settingsForm" class="painel" method="POST" action="/settings.php">
+        <h1 class="titulo">Configurações gerais</h1>
+        <p class="subtitulo">Ajustes globais do portal HoneyWeb</p>
+
+        <div class="campo">
+          <label for="site_nome">Nome do site</label>
+          <input type="text" id="site_nome" name="site_nome" value="HoneyWeb Portal" />
+        </div>
+        <div class="campo">
+          <label for="site_url">Endereço (URL) do site</label>
+          <input type="text" id="site_url" name="site_url" value="https://portal.honeyweb.local" />
+        </div>
+        <div class="campo">
+          <label for="admin_email">E-mail do administrador</label>
+          <input type="email" id="admin_email" name="admin_email" value="admin@honeyweb.local" />
+        </div>
+        <div class="campo">
+          <label for="fuso">Fuso horário</label>
+          <select id="fuso" name="fuso">
+            <option selected>America/Sao_Paulo</option>
+            <option>UTC</option>
+            <option>Europe/Lisbon</option>
+          </select>
+        </div>
+
+        <h2 class="secao">Segurança</h2>
+        <label class="check"><input type="checkbox" name="registro_aberto" checked /> Qualquer pessoa pode se registrar</label>
+        <label class="check"><input type="checkbox" name="debug" /> Ativar modo de depuração</label>
+        <label class="check"><input type="checkbox" name="2fa" /> Exigir autenticação em dois fatores</label>
+        <div class="campo">
+          <label for="papel_padrao">Função padrão para novos usuários</label>
+          <select id="papel_padrao" name="papel_padrao">
+            <option>Assinante</option>
+            <option>Editor</option>
+            <option selected>Administrador</option>
+          </select>
+        </div>
+
+        <button type="submit" class="botao">Salvar alterações</button>
+      </form>
+
+      <!-- Área onde aparece o "Processando..." e depois a resposta -->
+      <div id="resposta" class="resposta"></div>
+    </div>
+
+    <!-- JS estático do Flask -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
+</html>

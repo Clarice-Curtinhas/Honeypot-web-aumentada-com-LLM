@@ -10,6 +10,7 @@ import os
 import requests
 import psutil
 import pandas as pd
+import random
 
 PORTA = 6789
 
@@ -34,6 +35,13 @@ COLUNAS_REQUISICAO = ["timestamp", "IP", "metodo", "path", "user_agent", "prompt
 # ram_mb: quantidade de RAM física utilizada pelo sistema em megabytes
 LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
 COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb", "qnt_threads"]
+
+# vetor que armazena possiveis paginas alvo
+pages_wordpress = ["wp-activate.php", "wp-config.php", "wp-cron.php", "wp-login.php", "wp-mail.php", "wp-settings.php"]
+
+# vetor que armazena os arquivos html que servem como respostas aos ataques staticos previstos
+fake_pages = ["activate.html", "config.html", "cron.html", "login.html", "mail.html", "settings.html"]
+# ate entao não usado -^
 
 csv_lock = Lock()  # Evita conflito de escrita entre threads simultâneas
 
@@ -150,6 +158,35 @@ def escreve_csv_req(data_hora, client_ip, metodo, path, user_agent, prompt, late
         "resposta_engodo": resposta_engodo
     }, COLUNAS_REQUISICAO, LOGS_CSV_PATH)
 
+def renderizar_template(nome_template: str) -> str:
+    """Lê um template e embute style.css / script.js diretamente no HTML,
+    para que o navegador não precise (nem possa) buscá-los em /static/."""
+    with open(os.path.join("templates", nome_template), "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # Substitui <link ... style.css ...> por <style>conteúdo</style>
+    if "filename='style.css'" in html:
+        with open(os.path.join("static", "style.css"), "r", encoding="utf-8") as f:
+            css = f.read()
+        html = re.sub(
+            r"<link[^>]*url_for\('static', filename='style\.css'\)[^>]*>",
+            lambda _: f"<style>\n{css}\n</style>",
+            html,
+        )
+
+    # Substitui <script src="... script.js ..."></script> por <script>conteúdo</script>
+    if "filename='script.js'" in html:
+        with open(os.path.join("static", "script.js"), "r", encoding="utf-8") as f:
+            js = f.read()
+        html = re.sub(
+            r"<script[^>]*url_for\('static', filename='script\.js'\)[^>]*>\s*</script>",
+            lambda _: f"<script>\n{js}\n</script>",
+            html,
+        )
+
+    return html
+
+
 def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads: int):
     
     psutil.cpu_percent(interval=None)
@@ -172,11 +209,8 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
     # Rota 1: Página inicial (templates/index.html)
     if metodo == "GET" and caminho == "/":
         try:
-            with open(os.path.join("templates", "index.html"), "r", encoding="utf-8") as f:
-                html = f.read()
-            # Substitui tags do Flask por caminhos estáticos diretos
-            html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
-            html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
+            # CSS e JS são embutidos no HTML (não existe rota /static/)
+            html = renderizar_template("index.html")
 
             data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -187,13 +221,12 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
         except FileNotFoundError:
             return formatar_resposta_http("404 Not Found", "text/plain", b"index.html nao encontrado")
 
-    if metodo == "GET" and caminho == "/wp-login.php":
+    # Rota 2: Página estatica (templates)
+    if metodo == "GET" and (caminho[1:] in pages_wordpress):
+            page_name = caminho[1:].split("-")[1].split(".")[0]
             try:
-                with open(os.path.join("templates", "login.html"), "r", encoding="utf-8") as f:
-                    html = f.read()
-                # Substitui tags do Flask por caminhos estáticos diretos
-                html = html.replace("{{ url_for('static', filename='style.css') }}", "/static/style.css")
-                html = html.replace("{{ url_for('static', filename='script.js') }}", "/static/script.js")
+                # CSS e JS são embutidos no HTML (não existe rota /static/)
+                html = renderizar_template(page_name + ".html")
 
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -202,27 +235,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
 
                 return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
             except FileNotFoundError:
-                return formatar_resposta_http("404 Not Found", "text/plain", b"login.html nao encontrado")
-    
-    # Rota 2: Arquivos estáticos (CSS, JS, imagens)
-    if metodo == "GET" and caminho.startswith("/static/"):
-        nome_arquivo = os.path.basename(caminho)
-        caminho_local = os.path.join("static", nome_arquivo)
-        if os.path.isfile(caminho_local):
-            with open(caminho_local, "rb") as f:
-                conteudo = f.read()
-            mime, _ = mimetypes.guess_type(caminho_local)
-            mime = mime or "application/octet-stream"
-
-            # data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
-            # escreve_csv_rede(client_ip, inicio, headers_str, body_str, conteudo, qnt_threads)
-
-            return formatar_resposta_http("200 OK", mime, conteudo)
-        return formatar_resposta_http("404 Not Found", "text/plain", b"Arquivo estatico nao encontrado")
-
-    # Aqui o método é POST (INPUT - PROMPT)
+                return formatar_resposta_http("404 Not Found", "text/plain", f"{page_name}.html nao encontrado".encode("utf-8"))
 
     # Rota 3: Endpoint da API do Honeypot (POST /api/perguntar)
     if metodo == "POST" and caminho == "/api/perguntar":
@@ -249,7 +262,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
             # O fetch() do script.js espera JSON; então indicamos para onde redirecionar
             # e o próprio navegador faz o GET /wp-login.php (que serve o login.html)
         
-            payload_json = json.dumps({"status": "redirect", "url": "/wp-login.php"}).encode("utf-8")
+            payload_json = json.dumps({"status": "redirect", "url": f"/{pages_wordpress[random.randint(0 , 5)]}"}).encode("utf-8")
 
             escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json, qnt_threads)
 

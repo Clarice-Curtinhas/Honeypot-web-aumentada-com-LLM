@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configuração do Sistema</title>
+    <!-- CSS estático do Flask -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body class="pagina">
+    <div class="container largo">
+      <!-- Logótipo Favo de Mel (SVG) -->
+      <div class="logo">
+        <svg
+          width="70"
+          height="70"
+          viewBox="0 0 100 100"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <polygon
+            points="50,5 72,17.5 72,42.5 50,55 28,42.5 28,17.5"
+            fill="#FFA500"
+          />
+          <polygon
+            points="73,44 95,56.5 95,81.5 73,94 51,81.5 51,56.5"
+            fill="#FF8C00"
+          />
+          <polygon
+            points="27,44 49,56.5 49,81.5 27,94 5,81.5 5,56.5"
+            fill="none"
+            stroke="#FFA500"
+            stroke-width="2"
+          />
+        </svg>
+      </div>
+
+      <div class="painel">
+        <h1 class="titulo">config.php</h1>
+        <p class="subtitulo">
+          Arquivo de configuração principal &mdash; última modificação:
+          2026-10-03 14:22
+        </p>
+        <pre class="codigo">
+&lt;?php
+/** Configurações do banco de dados */
+define( 'DB_NAME',     'honeyweb_prod' );
+define( 'DB_USER',     'hw_admin' );
+define( 'DB_PASSWORD', 'Hw!2026#prod_db' );
+define( 'DB_HOST',     '10.0.12.5:3306' );
+define( 'DB_CHARSET',  'utf8mb4' );
+
+/** Chaves de autenticação */
+define( 'AUTH_KEY',         'q7#Lp2@xV9!mZr4$Kt8^Wn1&amp;Ys6*Bd3' );
+define( 'SECURE_AUTH_KEY',  'Fz5!Gh8@Jk2#Lm9$Np4%Qr7^St1&amp;Uv6' );
+define( 'LOGGED_IN_KEY',    'Aa3#Bb6$Cc9%Dd2^Ee5&amp;Ff8*Gg1(Hh4' );
+
+/** Integrações externas */
+define( 'SMTP_HOST', 'mail.honeyweb.local' );
+define( 'SMTP_USER', 'noreply@honeyweb.local' );
+define( 'SMTP_PASS', 'Mail@2026!' );
+define( 'API_TOKEN', 'hw_live_8f3a91c2d47e4b0f9a6c55e1d2b7a0c3' );
+
+$table_prefix = 'hw_';
+define( 'WP_DEBUG', false );
+</pre
+        >
+        <p class="aviso">
+          &#9888; Este arquivo não deve estar acessível publicamente.
+        </p>
+      </div>
+
+      <!-- Área onde aparece o "Processando..." e depois a resposta -->
+      <div id="resposta" class="resposta"></div>
+    </div>
+
+    <!-- JS estático do Flask -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
+</html>

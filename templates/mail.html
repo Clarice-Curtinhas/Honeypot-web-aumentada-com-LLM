@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Webmail &mdash; Caixa de Entrada</title>
+    <!-- CSS estático do Flask -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body class="pagina">
+    <div class="container largo">
+      <!-- Logótipo Favo de Mel (SVG) -->
+      <div class="logo">
+        <svg width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="50,5 72,17.5 72,42.5 50,55 28,42.5 28,17.5" fill="#FFA500" />
+          <polygon points="73,44 95,56.5 95,81.5 73,94 51,81.5 51,56.5" fill="#FF8C00" />
+          <polygon points="27,44 49,56.5 49,81.5 27,94 5,81.5 5,56.5" fill="none" stroke="#FFA500" stroke-width="2" />
+        </svg>
+      </div>
+
+      <div class="painel lista">
+        <div class="caixa-topo">
+          <h1 class="titulo">Caixa de entrada</h1>
+          <span class="contador">admin@honeyweb.local &middot; 3 não lidas</span>
+        </div>
+
+        <div class="email nao-lido">
+          <div class="de">Suporte TI</div>
+          <div class="assunto">Nova senha do servidor de backup <small>&mdash; Conforme solicitado, segue o acesso temporário ao bkp01...</small></div>
+          <div class="data">13:42</div>
+        </div>
+        <div class="email nao-lido">
+          <div class="de">no-reply@honeyweb.local</div>
+          <div class="assunto">Código de ativação da sua conta <small>&mdash; Seu código é HW-7Q2K-91PX. Ele expira em 24h...</small></div>
+          <div class="data">11:08</div>
+        </div>
+        <div class="email nao-lido">
+          <div class="de">Financeiro</div>
+          <div class="assunto">Planilha de pagamentos &ndash; Novembro <small>&mdash; Em anexo a planilha com os dados bancários atualizados...</small></div>
+          <div class="data">09:15</div>
+        </div>
+        <div class="email">
+          <div class="de">Cron Daemon</div>
+          <div class="assunto">[web01] enviar_newsletter falhou <small>&mdash; SMTP Error 535: Authentication failed...</small></div>
+          <div class="data">17 nov</div>
+        </div>
+        <div class="email">
+          <div class="de">Carlos (DevOps)</div>
+          <div class="assunto">Re: acesso ao painel /config.php <small>&mdash; Deixei o arquivo exposto só até terminarmos a migração...</small></div>
+          <div class="data">15 nov</div>
+        </div>
+        <div class="email">
+          <div class="de">Segurança</div>
+          <div class="assunto">Lembrete: troca obrigatória de senhas <small>&mdash; Todas as contas administrativas devem trocar a senha até...</small></div>
+          <div class="data">10 nov</div>
+        </div>
+      </div>
+
+      <!-- Área onde aparece o "Processando..." e depois a resposta -->
+      <div id="resposta" class="resposta"></div>
+    </div>
+
+    <!-- JS estático do Flask -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
+</html>

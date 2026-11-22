@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tarefas Agendadas (Cron)</title>
+    <!-- CSS estático do Flask -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body class="pagina">
+    <div class="container largo">
+      <!-- Logótipo Favo de Mel (SVG) -->
+      <div class="logo">
+        <svg width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="50,5 72,17.5 72,42.5 50,55 28,42.5 28,17.5" fill="#FFA500" />
+          <polygon points="73,44 95,56.5 95,81.5 73,94 51,81.5 51,56.5" fill="#FF8C00" />
+          <polygon points="27,44 49,56.5 49,81.5 27,94 5,81.5 5,56.5" fill="none" stroke="#FFA500" stroke-width="2" />
+        </svg>
+      </div>
+
+      <div class="painel">
+        <h1 class="titulo">Tarefas agendadas</h1>
+        <p class="subtitulo">Executor: wp-cron.php &mdash; servidor: web01.honeyweb.local</p>
+        <div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th>Tarefa</th>
+                <th>Agenda</th>
+                <th>Comando</th>
+                <th>Última execução</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>backup_db</td>
+                <td><code>0 3 * * *</code></td>
+                <td><code>/opt/scripts/backup.sh --dest /var/backups/db</code></td>
+                <td>2026-11-22 03:00</td>
+                <td><span class="status ok">Sucesso</span></td>
+                <td><a href="#" class="link">Executar</a><a href="#" class="link">Editar</a></td>
+              </tr>
+              <tr>
+                <td>limpar_sessoes</td>
+                <td><code>*/30 * * * *</code></td>
+                <td><code>php /var/www/html/cli/clean_sessions.php</code></td>
+                <td>2026-11-22 13:30</td>
+                <td><span class="status ok">Sucesso</span></td>
+                <td><a href="#" class="link">Executar</a><a href="#" class="link">Editar</a></td>
+              </tr>
+              <tr>
+                <td>enviar_newsletter</td>
+                <td><code>0 9 * * 1</code></td>
+                <td><code>php /var/www/html/cli/mail_queue.php</code></td>
+                <td>2026-11-17 09:00</td>
+                <td><span class="status falha">Falhou (SMTP 535)</span></td>
+                <td><a href="#" class="link">Executar</a><a href="#" class="link">Editar</a></td>
+              </tr>
+              <tr>
+                <td>sync_usuarios</td>
+                <td><code>15 * * * *</code></td>
+                <td><code>python3 /opt/scripts/ldap_sync.py</code></td>
+                <td>2026-11-22 13:15</td>
+                <td><span class="status ok">Sucesso</span></td>
+                <td><a href="#" class="link">Executar</a><a href="#" class="link">Editar</a></td>
+              </tr>
+              <tr>
+                <td>rotacionar_logs</td>
+                <td><code>0 0 * * 0</code></td>
+                <td><code>/usr/sbin/logrotate /etc/logrotate.conf</code></td>
+                <td>2026-11-16 00:00</td>
+                <td><span class="status ok">Sucesso</span></td>
+                <td><a href="#" class="link">Executar</a><a href="#" class="link">Editar</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Área onde aparece o "Processando..." e depois a resposta -->
+      <div id="resposta" class="resposta"></div>
+    </div>
+
+    <!-- JS estático do Flask -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
+</html>
