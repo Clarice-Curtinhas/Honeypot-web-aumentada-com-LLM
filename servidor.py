@@ -1,7 +1,8 @@
 from socket import *
-from threading import Thread, Lock, active_count
+from threading import Thread, Lock, Semaphore, active_count
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-# from pyflowmeter.sniffer import create_sniffer
+import select
 import mimetypes
 import json
 import re
@@ -12,16 +13,25 @@ import psutil
 import pandas as pd
 import random
 
-PORTA = 6789
+#=============================================
+# Variáveis globais importantes
+
+HOST = '127.0.0.1' # Endereço de IP do servidor (localhost)
+PORTA = 6789 # Porta onde o servidor vai escutar 
+MAX_CLIENTS = 20 # Número máximo de clientes
+
+MAX_LLM = 2 # limite de chamadas simultâneas à LLM
+llm_executor = ThreadPoolExecutor(max_workers=MAX_LLM) # Criação de um conjunto de threads que faz as requisições de llm separadamente (objetivo: não travar as respostas para outros usuários)
+conexoes_semaforo = Semaphore(MAX_CLIENTS) # Cria um semáforo para as threads
 
 LOGS_DIR = "./logs"
 
-#variaveis da llm
 #=============================================
+# Variaveis da llm
 BASE_URL = os.getenv("LLM_BASE_URL", "http://127.0.0.1:4000/v1").rstrip("/")
 CA_CERT = os.getenv("LLM_CA_CERT")
 MODELO = os.getenv("LLM_MODEL", "qwen7b")
-TIMEOUT_S = 600
+TIMEOUT_S = 10
 
 LOGS_CSV_PATH = os.path.join(LOGS_DIR, "requisicao.csv")
 COLUNAS_REQUISICAO = ["timestamp", "IP", "metodo", "path", "user_agent", "prompt", "latencia_llm_ms", "status_llm", "resposta_engodo"]
@@ -34,7 +44,7 @@ COLUNAS_REQUISICAO = ["timestamp", "IP", "metodo", "path", "user_agent", "prompt
 # cpu_pct: porcentagem de uso da cpu do servidor para responder as requisições atuais (mais interessante quando tivermos a llm funcionando)
 # ram_mb: quantidade de RAM física utilizada pelo sistema em megabytes
 LOGS_REDE_PATH = os.path.join(LOGS_DIR, "redes.csv")
-COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb", "qnt_threads"]
+COLUNAS_REDE = ["src_IP", "latencia_ms", "bytes_requisicao", "bytes_resposta", "cpu_pct", "ram_mb", "qnt_threads", "status_conexao"]
 
 # vetor que armazena possiveis paginas alvo
 pages_wordpress = ["wp-activate.php", "wp-config.php", "wp-cron.php", "wp-login.php", "wp-mail.php", "wp-settings.php"]
@@ -58,31 +68,41 @@ def salvar_csv(registro: dict, COLUNAS, CSV_PATH) -> None:
     with csv_lock:
         linha.to_csv(CSV_PATH, mode="a", header=False, index=False)
 
-def ler_requisicao_completa(conn: socket) -> tuple[str, str]:
+def ler_requisicao_completa(conn: socket, timeout_seg: float = 5.0) -> tuple[str, str, str]:
     """Lê cabeçalhos HTTP até \\r\\n\\r\\n e depois lê o corpo conforme Content-Length."""
+    conn.settimeout(timeout_seg)
     buffer = b""
-    while b"\r\n\r\n" not in buffer:
-        chunk = conn.recv(4096)
-        if not chunk:
-            return "", ""
-        buffer += chunk
+    try:
+        while b"\r\n\r\n" not in buffer:
+            chunk = conn.recv(4096)
+            if not chunk:
+                return "", ""
+            buffer += chunk
 
-    header_bytes, body_bytes = buffer.split(b"\r\n\r\n", 1)
-    headers_str = header_bytes.decode("utf-8", errors="ignore")
+        header_bytes, body_bytes = buffer.split(b"\r\n\r\n", 1)
+        headers_str = header_bytes.decode("utf-8", errors="ignore")
 
-    content_length = 0
-    for linha in headers_str.split("\r\n")[1:]:
-        if linha.lower().startswith("content-length:"):
-            content_length = int(linha.split(":", 1)[1].strip())
-            break
+        content_length = 0
+        for linha in headers_str.split("\r\n")[1:]:
+            if linha.lower().startswith("content-length:"):
+                content_length = int(linha.split(":", 1)[1].strip())
+                break
 
-    while len(body_bytes) < content_length:
-        chunk = conn.recv(4096)
-        if not chunk:
-            break
-        body_bytes += chunk
+        while len(body_bytes) < content_length:
+            chunk = conn.recv(4096)
+            if not chunk:
+                break
+            body_bytes += chunk
 
-    return headers_str, body_bytes.decode("utf-8", errors="ignore")
+        return headers_str, body_bytes.decode("utf-8", errors="ignore"), "ok"
+    
+    except TimeoutError:
+        return "", "", "timeout_leitura"
+
+    except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+        return "", "", "conexao_resetada"
+    except OSError as erro:
+        return "", "", f"erro_socket:{erro.errno}"
 
 def formatar_resposta_http(status: str, content_type: str, body: bytes) -> bytes:
     header = (
@@ -125,7 +145,7 @@ def consultar_llm(prompt: str) -> tuple[str, str]:
     except (ValueError, KeyError, IndexError):
         return "", "erro: resposta inesperada"
 
-def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html, qnt_threads):
+def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html, qnt_threads, status_con):
 
     latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
     cpu_pct = psutil.cpu_percent(interval=None)
@@ -142,6 +162,7 @@ def escreve_csv_rede(client_ip, inicio, headers_str, body_str, html, qnt_threads
         "cpu_pct": cpu_pct,
         "ram_mb": ram_mb,
         "qnt_threads": qnt_threads,
+        "status_conexao": status_con,
     }, COLUNAS_REDE, LOGS_REDE_PATH)
 
 def escreve_csv_req(data_hora, client_ip, metodo, path, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo):
@@ -186,8 +207,14 @@ def renderizar_template(nome_template: str) -> str:
 
     return html
 
+def processa_llm_thread(prompt: str) -> tuple[str, float, str]:
+    inicio_llm = time.perf_counter()
+    resposta_engodo, status_llm = consultar_llm(prompt) # (AQUI: DEVE-SE IMPLEMENTAR A FUNÇÃO CONSULTAR PROMPT)
+    # resposta_engodo = "Processando o seu pedido no modelo..."   placeholder até consultar_llm existir
+    latencia_llm_ms = round((time.perf_counter() - inicio_llm) * 1000, 2)
+    return resposta_engodo, latencia_llm_ms, status_llm
 
-def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads: int):
+def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads: int, status_con: str):
     
     psutil.cpu_percent(interval=None)
     inicio = time.perf_counter()
@@ -215,7 +242,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
             data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
-            escreve_csv_rede(client_ip, inicio, headers_str, body_str, html.encode("utf-8"), qnt_threads)
+            escreve_csv_rede(client_ip, inicio, headers_str, body_str, html.encode("utf-8"), qnt_threads, status_con)
             
             return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
         except FileNotFoundError:
@@ -231,7 +258,7 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
                 data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, None, None, None, None)
-                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html.encode("utf-8"), qnt_threads)
+                escreve_csv_rede(client_ip, inicio, headers_str, body_str, html.encode("utf-8"), qnt_threads, status_con)
 
                 return formatar_resposta_http("200 OK", "text/html; charset=utf-8", html.encode("utf-8"))
             except FileNotFoundError:
@@ -239,7 +266,6 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
 
     # Rota 3: Endpoint da API do Honeypot (POST /api/perguntar)
     if metodo == "POST" and caminho == "/api/perguntar":
-        inicio_llm = time.perf_counter()
         try:
             dados = json.loads(body_str) if body_str else {}
         except json.JSONDecodeError:
@@ -248,14 +274,12 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
         prompt = dados.get("prompt", "")
         data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        resposta_engodo, status_llm = consultar_llm(prompt) # (AQUI: DEVE-SE IMPLEMENTAR A FUNÇÃO CONSULTAR PROMPT)
-        # resposta_engodo = "Processando o seu pedido no modelo..."   placeholder até consultar_llm existir
-        latencia_llm_ms = round((time.perf_counter() - inicio_llm) * 1000, 2)
+        with conexoes_semaforo:
+            analise_llm = llm_executor.submit(processa_llm_thread, prompt)
+            resposta_engodo, latencia_llm_ms, status_llm = analise_llm.result(timeout=TIMEOUT_S)
 
         print(f"\n[HONEYPOT SOCKET CAPTURA] {data_hora} | IP: {client_ip} | {status_llm} ({latencia_llm_ms} ms)")
         print(f"Prompt: {prompt}\nEngodo: {resposta_engodo[:150]}...\n")
-
-        escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo)
 
         
         if status_llm != "ok":
@@ -264,52 +288,103 @@ def montar_resposta(headers_str: str, body_str: str, client_ip: str, qnt_threads
         
             payload_json = json.dumps({"status": "redirect", "url": f"/{pages_wordpress[random.randint(0 , 5)]}"}).encode("utf-8")
 
-            escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json, qnt_threads)
+            escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo)
+            escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json, qnt_threads, status_con)
 
             return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
 
         # Extrai só o documento HTML: do <!DOCTYPE até o último </html>, descartando
         # qualquer texto ou cerca de markdown que a LLM tenha colocado antes ou depois
+        
         documento = re.search(r"<!DOCTYPE.*</html\s*>", resposta_engodo, re.S | re.I)
         if documento:
             resposta_engodo = documento.group(0)
 
         payload_json = json.dumps({"status": "success", "resposta": resposta_engodo}, ensure_ascii=False).encode("utf-8")
+        escreve_csv_req(data_hora, client_ip, metodo, caminho, user_agent, prompt, latencia_llm_ms, status_llm, resposta_engodo)
+        escreve_csv_rede(client_ip, inicio, headers_str, body_str, payload_json, qnt_threads, status_con)
+
         return formatar_resposta_http("200 OK", "application/json; charset=utf-8", payload_json)
 
     return formatar_resposta_http("404 Not Found", "text/html; charset=utf-8", b"<h1>404 Not Found</h1>")
 
-def handle_client(connectionSocket: socket, addr: tuple):
-    try:
-        headers_str, body_str = ler_requisicao_completa(connectionSocket)
-        if headers_str:                            # vazio = cliente fechou sem enviar nada
-            connectionSocket.sendall(montar_resposta(headers_str, body_str, addr[0], active_count()))
-    finally:
-        connectionSocket.close()
+def handle_client(connectionSocket: socket, addr: tuple, lock_socket, clients):
+    inicio = time.perf_counter()
+    ip_cliente = addr[0]
+    status_conn = "ok"
+    headers_str, body_str = "", ""
 
-if __name__ == '__main__':                     # só roda ao executar este arquivo diretamente
+    try:
+        headers_str, body_str, status_conn = ler_requisicao_completa(connectionSocket, timeout_seg=10.0)
+
+        if status_conn == "ok" and headers_str:                # vazio = cliente fechou sem enviar nada
+            resposta = montar_resposta(headers_str, body_str, addr[0], active_count(), status_conn)
+            connectionSocket.settimeout(10.0)
+            connectionSocket.sendall(resposta)
+
+    except TimeoutError:
+        status_conn = "timeout"
+
+    except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+        status_conn = "erro_de_conexao"
+
+    except OSError as e:
+        status_conn = f"erro_envio:{e.errno}"
+
+    finally:
+        if status_conn != "ok":
+            escreve_csv_rede(ip_cliente, inicio, headers_str, body_str, b"", active_count(), status_conn)
+
+        with lock_socket:
+            clients.discard(connectionSocket)
+
+        try:
+            connectionSocket.close()
+
+        except OSError:
+            pass
+
+# Função principal para iniciar o servidor
+def start_server():
     serverSocket = socket(AF_INET, SOCK_STREAM)
     serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    serverSocket.bind(('0.0.0.0', PORTA))
+    serverSocket.setblocking(0)
+    serverSocket.bind((HOST, PORTA))
     serverSocket.listen(128)
-    print(f'Servidor multithread na porta {PORTA}...')
+    serverSocket.settimeout(1.0)
 
-    # sniffer = create_sniffer(
-    #         input_file='path_to_the_file.pcap',
-    #         to_csv=True,
-    #         output_file='./flows_test.csv',
-    #     )
+    lock_socket = Lock()
 
-    # sniffer.start()
-    # try:
-    #     sniffer.join()
-    # except KeyboardInterrupt:
-    #     print('Stopping the sniffer')
-    #     sniffer.stop()
-    # finally:
-    #     sniffer.join()
+    # Lista de sockets que o select deve monitorar
+    sockets_list = [serverSocket]
 
-    while True:
-        connectionSocket, addr = serverSocket.accept()
-        Thread(target=handle_client, args=(connectionSocket, addr), daemon=True).start()   # novidade
-        print('Conexão de', addr, '| threads ativas:', active_count())
+    clients = set()
+
+    print(f'Servidor iniciado e escutado em {HOST}: {PORTA}...')
+
+    while True: 
+        try:
+            connectionSocket, addr = serverSocket.accept()
+        except TimeoutError:
+            continue
+        except OSError:
+            break
+
+        with lock_socket:
+            if len(clients) >= MAX_CLIENTS:
+                try:
+                    connectionSocket.sendall(b'Servidor cheio. Tente mais tarde.')
+                except OSError:
+                    pass
+                connectionSocket.close()
+                continue
+
+            clients.add(connectionSocket)
+                
+            print('Conexão de', addr, '| threads ativas:', active_count())
+
+            Thread(target=handle_client, args=(connectionSocket, addr, lock_socket, clients), daemon=True).start()
+    
+if __name__ == '__main__':                     # só roda ao executar este arquivo diretamente
+
+    start_server()

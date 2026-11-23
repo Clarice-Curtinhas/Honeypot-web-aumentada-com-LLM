@@ -6,12 +6,15 @@ import matplotlib.pyplot as plt
 rede = pd.read_csv('./logs/redes.csv')
 requisicao = pd.read_csv('./logs/requisicao.csv')
 
-plt.plot(rede.latencia_ms, rede.cpu_pct)
-plt.plot(rede.latencia_ms, rede.ram_mb)
-plt.plot(rede.latencia_ms, rede.qnt_threads)
-plt.title("Interferência da latência no consumo de cpu")
-plt.xlabel("Latência (ms)")
-plt.ylabel("Uso de CPU (%)")
+rede["falhou"] = rede["status_conexao"] != "ok"
+
+print(rede.describe())
+print(rede)
+
+plt.bar(rede.status_conexao, rede.latencia_ms, log=True)
+plt.title("Interferência da rede na latência")
+plt.ylabel("Latência (ms)")
+plt.xlabel("Falhas de Rede")
 
 plt.grid(True)
-plt.savefig("grafico.png")
+plt.savefig("Falhas_de_rede_vs_latencia.png")

