@@ -1,6 +1,7 @@
 <div align="center">
 <h1>Honeypot-web-aumentada-com-LLM </h1>
 <p> Repositório do trabalho da disciplina de Redes de Computadores do curso de Engenharia de Computação da Universidade Federal do Espírito Santo. </p>
+<p> Trabalho realizado por <b>Ellyas Hiagamo</b> e <b>Clarice Curtinhas</b>. </p>
 </div>
 
 ## Sumário
@@ -31,9 +32,51 @@ O projeto consiste na integração de uma LLM local com um servidor de Honeypot 
 ### Requisitos
 * **Python 3+**
 * **Ollama** (ou servidor de inferência local equivalente) rodando o modelo Qwen2.5-7B acessível em http://127.0.0.1:4000/v1 (ou configurado via variável de ambiente).
-* Dependências Python:
+* **pip** (gerenciador de pacotes do Python)
+* **iproute2** (apenas para os testes com `tc netem`, em Linux)
+
+### Instalação das Dependências
+1. Clone o repositório e entre na pasta do projeto:
 ```bash
-pip install psutil pandas requests
+git clone <url-do-repositorio>
+cd Honeypot-web-aumentada-com-LLM
+```
+
+2. (Recomendado) Crie e ative um ambiente virtual:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+.venv\Scripts\activate           # Windows
+```
+
+3. Instale as dependências Python listadas em *requirements.txt*:
+```bash
+pip install -r requirements.txt
+```
+
+Ou, manualmente:
+```bash
+pip install psutil pandas requests matplotlib
+```
+
+| Pacote | Uso |
+|---|---|
+| psutil | Métricas de CPU/RAM no servidor |
+| pandas | Escrita dos logs em CSV e análises |
+| requests | Comunicação com a API da LLM e testes |
+| matplotlib | Geração dos gráficos (*analise.py*, *teste_hipotese.py*) |
+
+As demais bibliotecas usadas (socket, threading, concurrent.futures, json, argparse etc.) fazem parte da biblioteca padrão do Python.
+
+4. Instale o **Ollama** e baixe o modelo Qwen2.5-7B:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh   # Linux (no Windows/macOS use o instalador do site ollama.com)
+ollama pull qwen2.5:7b
+```
+
+5. (Apenas para testes de rede, Linux) Instale o iproute2, caso não esteja presente:
+```bash
+sudo apt install iproute2
 ```
 
 ### Instruções de Execução
